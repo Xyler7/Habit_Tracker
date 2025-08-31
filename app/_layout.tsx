@@ -1,59 +1,56 @@
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { Stack, useRouter, useSegments } from "expo-router";
+import React, { useEffect } from "react";
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { PaperProvider } from "react-native-paper";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { useColorScheme } from '@/components/useColorScheme';
-
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
-
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
-};
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
-
-export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-    ...FontAwesome.font,
-  });
-
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
+function useAuthRedirect(user: any, isLoadingUser: boolean, segments: string[], router: any) {
   useEffect(() => {
-    if (error) throw error;
-  }, [error]);
+    if (isLoadingUser) return;
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    const inAuthGroup = segments?.[0] === "auth";
+
+    if (!user && !inAuthGroup) {
+      router.replace("/auth");
+    } else if (user && inAuthGroup) {
+      router.replace("/");
     }
-  }, [loaded]);
+  }, [user, isLoadingUser, segments, router]);
+}
 
-  if (!loaded) {
-    return null;
+function RouteGuard({ children }: { children: React.ReactNode }) {
+  const { user, isLoadingUser } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useAuthRedirect(user, isLoadingUser, segments, router);
+
+  if (isLoadingUser) {
+    return null; // Loading Spinner
   }
 
-  return <RootLayoutNav />;
+  return <>{children}</>;
 }
 
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
 
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
-  );
+
+export default function Root() {
+    return (
+      <GestureHandlerRootView style={{flex:1}}>
+        <AuthProvider>
+          <PaperProvider>
+            <SafeAreaProvider>
+              <RouteGuard>
+                  <Stack> 
+                    <Stack.Screen name="auth" options={{ headerShown: false }} />
+                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  </Stack>
+              </RouteGuard>
+            </SafeAreaProvider>
+          </PaperProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
+    );
 }
+
