@@ -8,6 +8,7 @@ export default function AuthScreen() {
     const [isSignUp, setIsSignUp] = useState<boolean>(false);
     const [email, setEmail] = useState<string>("");
     const [password, setPassword] = useState<string>("");
+    const [password2, setPassword2] = useState<string>("");
     const [error, setError] = useState<string | null>("");
 
     const theme = useTheme();
@@ -20,12 +21,16 @@ export default function AuthScreen() {
             setError("Email and password are required.");
             return;
         }
-        if (password.length < 6) {
-            setError("Password must be at least 6 characters long.");
+        if (password.length < 8) {
+            setError("Password must be at least 8 characters long.");
             return;
         }
         if (email.indexOf("@") === -1) {
             setError("Please enter a valid email address.");
+            return;
+        }
+        if (isSignUp && password !== password2) {
+            setError("Passwords do not match.");
             return;
         }
         setError(null);
@@ -36,13 +41,13 @@ export default function AuthScreen() {
                 setError(result);
                 return;
             }
+            router.replace("/");
         } else {
             const result = await signIn(email, password);
             if (typeof result === "string") {
                 setError(result);
                 return;
             }
-            setError(null); // giriş başarılı, hata yok
             router.replace("/");
         }
     };
@@ -53,7 +58,7 @@ export default function AuthScreen() {
 
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === "android" ? "padding" : "height"}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.container}
         >
             <View style={styles.content}>
@@ -73,14 +78,27 @@ export default function AuthScreen() {
 
                 <TextInput
                     label="Password"
+                    value={password}
                     autoCapitalize="none"
                     secureTextEntry={true}
                     mode="outlined"
                     style={styles.input}
                     onChangeText={setPassword}
                 />
+                
+                {isSignUp && (
+                    <TextInput
+                        label="Confirm Password"
+                        value={password2}
+                        autoCapitalize="none"
+                        secureTextEntry={true}
+                        mode="outlined"
+                        style={styles.input}
+                        onChangeText={setPassword2}
+                    />
+                )}
 
-                {error && (
+                 {error && (
                     <Text style={{ color: theme.colors.error }}>{error}</Text>
                 )}
 
