@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { ID, Permission, Role } from "react-native-appwrite";
-import { Button, SegmentedButtons, TextInput, useTheme } from "react-native-paper";
+import { Button, SegmentedButtons, TextInput, useTheme, Text } from "react-native-paper";
 
 const FREQUENCIES = ["daily", "weekly", "monthly"];
 type Frequency = (typeof FREQUENCIES)[number];
@@ -54,6 +54,8 @@ export default function AddHabitScreen() {
 
   return (
     <View style={styles.container}>
+      <Text style={styles.title} variant="headlineSmall">Add a new habit!</Text>
+    
       <TextInput
         label="Title"
         mode="outlined"
@@ -88,6 +90,10 @@ export default function AddHabitScreen() {
 }
 
 const styles = StyleSheet.create({
+   title: {
+    fontWeight: "bold",
+    paddingLeft: 4,
+  },
   container: {
     flex: 1,
     padding: 16,

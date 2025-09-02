@@ -1,12 +1,13 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from "expo-router";
 
+const username = "Xyler7"; 
+
 export default function TabsLayout() {
     return (
       <Tabs
       screenOptions={{
         headerStyle: { backgroundColor: '#ffba00'},
-        headerShadowVisible: false,
         tabBarStyle:{
             backgroundColor: '#f5f5f5',
             borderTopWidth: 0,
@@ -20,10 +21,12 @@ export default function TabsLayout() {
         <Tabs.Screen name="index" options={
             {
                 title: "Today's Tasks",
-                tabBarIcon: ({ color, size }) => <MaterialCommunityIcons
-                name="calendar-today"
-                size= { size }
-                color={ color }/>
+                tabBarIcon: ({ color, size }) =>
+                <MaterialCommunityIcons
+                    name="calendar-today"
+                    size= { size }
+                    color={ color }
+                />
             }
         } />
 
