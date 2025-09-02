@@ -54,6 +54,10 @@ export default function AuthScreen() {
 
     const handleSwitchMode = () => {
         setIsSignUp((prev) => !prev);
+        setError(null);
+        setEmail("");
+        setPassword("");
+        setPassword2("");
     };
 
     return (
@@ -68,6 +72,7 @@ export default function AuthScreen() {
 
                 <TextInput
                     label="Email"
+                    value={email}
                     autoCapitalize="none"
                     keyboardType="email-address"
                     placeholder="example@gmail.com"
