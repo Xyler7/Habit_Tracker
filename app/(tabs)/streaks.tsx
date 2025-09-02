@@ -20,7 +20,7 @@ export default function StreakScreen() {
           HABITS_COLLECTION_ID,
           [Query.equal("user_id", user?.$id ?? "")]
         );
-        setHabits(response.documents as Habit[]);
+        setHabits(response.documents as unknown as Habit[]);
       } catch (error) {
         console.error("Error fetching habits:", error);
       }
@@ -36,7 +36,7 @@ export default function StreakScreen() {
               Query.equal("user_id", user?.$id ?? ""),
             ]
           );
-          const completions = response.documents as habitCompletions[];
+          const completions = response.documents as unknown as habitCompletions[];
           setCompletedHabits(completions);  
         } catch (error) {
           console.error("Error fetching habits:", error);
