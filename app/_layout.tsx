@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { CoinProvider } from "@/lib/coin-context";
 
 function useAuthRedirect(user: any, isLoadingUser: boolean, segments: string[], router: any) {
   useEffect(() => {
@@ -41,12 +42,14 @@ export default function Root() {
         <AuthProvider>
           <PaperProvider>
             <SafeAreaProvider>
+              <CoinProvider>
               <RouteGuard>
                   <Stack> 
                     <Stack.Screen name="auth" options={{ headerShown: false }} />
                     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                   </Stack>
               </RouteGuard>
+              </CoinProvider>
             </SafeAreaProvider>
           </PaperProvider>
       </AuthProvider>

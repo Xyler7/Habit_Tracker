@@ -11,6 +11,7 @@ import { playSound } from "../../utils/sound";
 import  checked from "@/assets/sounds/checked.mp3";
 import deleted from '@/assets/sounds/deleted.mp3';
 import deny from '@/assets/sounds/deny.mp3';
+import { useCoins } from "@/lib/coin-context";
 
 const Index: React.FC = () => {
   const { signOut, user } = useAuth();
@@ -22,6 +23,8 @@ const Index: React.FC = () => {
     completions: habitCompletions[];
   } | null>(null);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
+
+  const { coins, addCoins } = useCoins();
 
   const swipeableRefs = useRef<{ [key: string]: Swipeable | null }>({});
 
@@ -185,6 +188,8 @@ const Index: React.FC = () => {
         streak_count: habit.streak_count + 1,
         last_completed: new Date().toISOString(),
       });
+
+      addCoins(5);
     } catch (error) {
       console.error(error);
     }
@@ -211,7 +216,6 @@ const Index: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text variant="headlineSmall" style={styles.title}>Today&apos;s Habits</Text>
         <Button mode="text" onPress={signOut} icon={"logout"}>Sign Out</Button>
       </View>
 
@@ -304,7 +308,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     alignItems: "center",
     marginBottom: 16,
   },

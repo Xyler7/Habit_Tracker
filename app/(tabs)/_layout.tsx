@@ -1,9 +1,14 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from "expo-router";
+import { View } from 'react-native';
+import { Text } from 'react-native-paper';
+import { useCoins } from "@/lib/coin-context";
 
 const username = "Xyler7"; 
 
 export default function TabsLayout() {
+    const { coins } = useCoins();
+    
     return (
       <Tabs
       screenOptions={{
@@ -17,6 +22,11 @@ export default function TabsLayout() {
         tabBarActiveTintColor: '#ffab00',
         tabBarInactiveTintColor: '#666666',
 
+        headerRight: () => (
+      <View style={{ flexDirection: "row", alignItems: "center", marginRight: 18 }}>
+        <Text style={{ color: "#fff", fontWeight: "bold", marginRight: 6, fontSize:18 }}>{coins} 🪙</Text>
+      </View>
+    )
     }}> 
         <Tabs.Screen name="index" options={
             {
