@@ -10,6 +10,9 @@ export default function AuthScreen() {
     const [password, setPassword] = useState<string>("");
     const [password2, setPassword2] = useState<string>("");
     const [error, setError] = useState<string | null>("");
+    const [username, setUsername] = useState("");
+    const [firstname, setFirstName] = useState("");
+    const [lastname, setLastName] = useState("");
 
     const theme = useTheme();
     const router = useRouter();
@@ -58,6 +61,9 @@ export default function AuthScreen() {
         setEmail("");
         setPassword("");
         setPassword2("");
+        setUsername("");
+        setFirstName("");
+        setLastName("");
     };
 
     return (

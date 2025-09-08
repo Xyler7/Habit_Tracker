@@ -13,6 +13,7 @@ export default function TabsLayout() {
       <Tabs
       screenOptions={{
         headerStyle: { backgroundColor: '#ffba00'},
+        headerTintColor: '#f5f5f5', // ✅ Başlık metni rengi (örn. siyah yaptım)
         tabBarStyle:{
             backgroundColor: '#f5f5f5',
             borderTopWidth: 0,
@@ -23,10 +24,10 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: '#666666',
 
         headerRight: () => (
-      <View style={{ flexDirection: "row", alignItems: "center", marginRight: 18 }}>
-        <Text style={{ color: "#fff", fontWeight: "bold", marginRight: 6, fontSize:18 }}>{coins} 🪙</Text>
-      </View>
-    )
+            <View style={{ flexDirection: "row", alignItems: "center", marginRight: 18 }}>
+                <Text style={{ color: "#fff", fontWeight: "bold", marginRight: 6, fontSize:18 }}>{coins} 🪙</Text>
+            </View>
+        )
     }}> 
         <Tabs.Screen name="index" options={
             {

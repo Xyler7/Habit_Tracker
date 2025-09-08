@@ -147,9 +147,7 @@ export default function StreakScreen() {
     const badgeStyles = [styles.badge1, styles.badge2, styles.badge3]
 
 return (
-    <View style= {styles.container}>
-        <Text style={styles.title} variant="headlineSmall">Habit Streaks</Text>
-        
+    <View style= {styles.container}>        
         {rankedHabits.length > 0 && (
             <View style={styles.rankingContainer}> 
                 <Text style={styles.rankingTitle}> 🏅 Top Streaks </Text>

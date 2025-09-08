@@ -80,6 +80,7 @@ export default function AddHabitScreen() {
       </View>
       <Button
         mode="contained"
+        buttonColor="#8f028fff"
         onPress={() => { void handleSubmit(); }}
         disabled={!title || !description}
         >

@@ -1,4 +1,4 @@
-import { client, COMPLETIONS_COLLECTION_ID, DATABASE_ID, databases, HABITS_COLLECTION_ID, RealtimeResponse } from "@/lib/appwrite";
+import { client, COMPLETIONS_COLLECTION_ID, DATABASE_ID, databases, HABITS_COLLECTION_ID } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { Habit, habitCompletions } from "@/types/database.type";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -8,382 +8,293 @@ import { ID, Query } from "react-native-appwrite";
 import { Swipeable } from "react-native-gesture-handler";
 import { Button, Snackbar, Surface, Text } from "react-native-paper";
 import { playSound } from "../../utils/sound";
-import  checked from "@/assets/sounds/checked.mp3";
+import checked from "@/assets/sounds/checked.mp3";
 import deleted from '@/assets/sounds/deleted.mp3';
 import deny from '@/assets/sounds/deny.mp3';
 import { useCoins } from "@/lib/coin-context";
 
-const Index: React.FC = () => {
+export default function Index() {
   const { signOut, user } = useAuth();
 
   const [habits, setHabits] = useState<Habit[]>([]);
-  const [completedHabits, setCompletedHabits] = useState<string[]>([]);
-  const [deletedHabitBackup, setDeletedHabitBackup] = useState<{
+  const [deletedBackup, setDeletedBackup] = useState<{
     habit: Habit;
     completions: habitCompletions[];
   } | null>(null);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const { addCoins } = useCoins();
+  const swipeRefs = useRef<{ [k: string]: Swipeable | null }>({});
 
-  const { coins, addCoins } = useCoins();
-
-  const swipeableRefs = useRef<{ [key: string]: Swipeable | null }>({});
-
-  const fetchTodayCompletions = useCallback(async () => {
-    try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const response = await databases.listDocuments(
-        DATABASE_ID,
-        COMPLETIONS_COLLECTION_ID,
-        [
-          Query.equal("user_id", user?.$id ?? ""),
-          Query.greaterThanEqual("completed_at", today.toISOString()),
-        ]
-      );
-
-      const completions: habitCompletions[] = response.documents.map((doc: any) => ({
-        ...doc, // Models.Document metadata
-        habit_id: doc.habit_id ?? doc.data?.habit_id ?? "",
-        user_id: doc.user_id ?? doc.data?.user_id ?? "",
-        completed_at: doc.completed_at ?? doc.data?.completed_at ?? "",
-      }));
-
-      setCompletedHabits(completions.map((c) => c.habit_id));
-    } catch (error) {
-      console.error("Error fetching habits:", error);
-    }
-  }, [user]);
-
+  // 1) Tüm habit’leri çek
   const fetchHabits = useCallback(async () => {
-    try {
-      const response = await databases.listDocuments(
-        DATABASE_ID,
-        HABITS_COLLECTION_ID,
-        [Query.equal("user_id", user?.$id ?? "")]
-      );
-      setHabits(response.documents as unknown as Habit[]);
-    } catch (error) {
-      console.error("Error fetching habits:", error);
-    }
+    if (!user) return;
+    const res = await databases.listDocuments(
+      DATABASE_ID,
+      HABITS_COLLECTION_ID,
+      [Query.equal("user_id", user.$id)]
+    );
+    setHabits(res.documents as unknown as Habit[]);
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
-
-    const habitsChannel = `databases.${DATABASE_ID}.collections.${HABITS_COLLECTION_ID}.documents`;
-    const habitsSubscription = client.subscribe(habitsChannel, () => {
-      fetchHabits();
-    });
-
-    const completionsChannel = `databases.${DATABASE_ID}.collections.${COMPLETIONS_COLLECTION_ID}.documents`;
-    const completionsSubscription = client.subscribe(completionsChannel, () => {
-      fetchTodayCompletions();
-    });
-
+    const chan = `databases.${DATABASE_ID}.collections.${HABITS_COLLECTION_ID}.documents`;
+    const unsub = client.subscribe(chan, fetchHabits);
     fetchHabits();
-    fetchTodayCompletions();
+    return () => unsub();
+  }, [user, fetchHabits]);
 
-    return () => {
-      habitsSubscription();
-      completionsSubscription();
-    };
-  }, [user, fetchHabits, fetchTodayCompletions]);
+  // 2) Lock kontrolü: last_completed null ise false, doluysa frekansa göre
+  const isHabitLocked = (habit: Habit) => {
+    // Henüz hiç tamamlanmamışsa kilit yok
+    if (habit.streak_count === 0) return false;
 
-  const handleDeleteHabit = async (habitId: string) => {
-    try {
-      const habit = habits.find((h) => h.$id === habitId);
-      if (!habit) return;
+    // Son tamamlama tarihi yoksa da kilit yok
+    if (!habit.last_completed) return false;
 
-      const completionsRes = await databases.listDocuments(
-        DATABASE_ID,
-        COMPLETIONS_COLLECTION_ID,
-        [Query.equal("habit_id", habitId)]
-      );
+    const last = new Date(habit.last_completed).getTime();
+    const now = Date.now();
+    let lockDays = 1;
 
-      const completions: habitCompletions[] = completionsRes.documents.map((doc: any) => ({
-        ...doc,
-        habit_id: doc.habit_id ?? doc.data?.habit_id ?? "",
-        user_id: doc.user_id ?? doc.data?.user_id ?? "",
-        completed_at: doc.completed_at ?? doc.data?.completed_at ?? "",
-      }));
+    if (habit.frequency === "weekly") lockDays = 7;
+    if (habit.frequency === "monthly") lockDays = 30;
 
-      setDeletedHabitBackup({ habit, completions });
-
-      for (const completion of completions) {
-        await databases.deleteDocument(
-          DATABASE_ID,
-          COMPLETIONS_COLLECTION_ID,
-          completion.$id
-        );
-      }
-
-      await databases.deleteDocument(DATABASE_ID, HABITS_COLLECTION_ID, habitId);
-
-      fetchHabits();
-      fetchTodayCompletions();
-      setSnackbarVisible(true);
-    } catch (error) {
-      console.error("❌ Error deleting habit and completions:", error);
-    }
+    const diffDays = (now - last) / (1000 * 60 * 60 * 24);
+    return diffDays < lockDays;
   };
 
-  const handleUndoDelete = async () => {
-    if (!deletedHabitBackup || !user) return;
 
-    try {
-      const { habit, completions } = deletedHabitBackup;
-
-      const cleanDocument = (doc: any) => {
-        const { $id, $collectionId, $databaseId, $createdAt, $updatedAt, $permissions, $sequence, ...rest } = doc;
-        return rest;
-      };
-
-      const newHabitId = ID.unique();
-      await databases.createDocument(
-        DATABASE_ID,
-        HABITS_COLLECTION_ID,
-        newHabitId,
-        { ...cleanDocument(habit), user_id: user.$id }
-      );
-
-      const today = new Date().toISOString().split("T")[0];
-      const todaysCompletion = completions.find((c) => {
-        const completionDate = new Date(c.completed_at).toISOString().split("T")[0];
-        return completionDate === today;
-      });
-
-      if (todaysCompletion) {
-        await databases.createDocument(
-          DATABASE_ID,
-          COMPLETIONS_COLLECTION_ID,
-          ID.unique(),
-          { ...cleanDocument(todaysCompletion), user_id: user.$id, habit_id: newHabitId }
-        );
-      }
-
-      fetchHabits();
-      fetchTodayCompletions();
-      setSnackbarVisible(false);
-      setDeletedHabitBackup(null);
-    } catch (error) {
-      console.error("❌ Error restoring habit:", error);
+  // 3) Sağa kaydırınca tamamla
+  const handleComplete = async (habit: Habit) => {
+    if (!user) return;
+    if (isHabitLocked(habit)) {
+      playSound(deny);
+      return;
     }
-  };
-
-  const handleCompleteHabit = async (id: string) => {
-    if (!user || completedHabits.includes(id)) return;
     try {
-      const currentDate = new Date().toISOString();
+      const now = new Date().toISOString();
       await databases.createDocument(
         DATABASE_ID,
         COMPLETIONS_COLLECTION_ID,
         ID.unique(),
-        { habit_id: id, user_id: user.$id, completed_at: currentDate }
+        { habit_id: habit.$id, user_id: user.$id, completed_at: now }
       );
-      const habit = habits.find((h) => h.$id === id);
-      if (!habit) return;
-
-      await databases.updateDocument(DATABASE_ID, HABITS_COLLECTION_ID, id, {
-        streak_count: habit.streak_count + 1,
-        last_completed: new Date().toISOString(),
-      });
-
-      addCoins(5);
-    } catch (error) {
-      console.error(error);
+      await databases.updateDocument(
+        DATABASE_ID,
+        HABITS_COLLECTION_ID,
+        habit.$id,
+        {
+          streak_count: habit.streak_count + 1,
+          last_completed: now,
+        }
+      );
+      // coin miktarı frekansa göre
+      if (habit.frequency === "weekly") addCoins(10);
+      else if (habit.frequency === "monthly") addCoins(20);
+      else addCoins(5);
+      playSound(checked);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      fetchHabits();
     }
   };
 
-  const isHabitCompleted = (habitID: string) => completedHabits.includes(habitID);
+  // 4) Sola kaydırınca sil
+  const handleDelete = async (habit: Habit) => {
+    if (!user) return;
+    // backup
+    const compRes = await databases.listDocuments(
+      DATABASE_ID,
+      COMPLETIONS_COLLECTION_ID,
+      [Query.equal("habit_id", habit.$id)]
+    );
+    const comps = (compRes.documents as any).map((d: habitCompletions): habitCompletions => ({
+      ...d,
+      habit_id: d.habit_id,
+      user_id: d.user_id,
+      completed_at: d.completed_at,
+    }));
+    setDeletedBackup({ habit, completions: comps });
+    // sil
+    await Promise.all(
+      comps.map((c: { $id: string; }) =>
+        databases.deleteDocument(
+          DATABASE_ID,
+          COMPLETIONS_COLLECTION_ID,
+          c.$id
+        )
+      )
+    );
+    await databases.deleteDocument(
+      DATABASE_ID,
+      HABITS_COLLECTION_ID,
+      habit.$id
+    );
+    fetchHabits();
+    setSnackbarVisible(true);
+    playSound(deleted);
+  };
 
-  const renderRightActions = (habitId: string) => (
-    <View style={styles.swipeActionRight}>
-      {isHabitCompleted(habitId) ? (
-        <Text style={{ color: "#ffba00", fontWeight: "bold" }}> Completed! </Text>
-      ) : (
-        <MaterialCommunityIcons name="check-circle-outline" size={32} color={"#ffba00"} />
-      )}
-    </View>
-  );
-
-  const renderLeftActions = () => (
-    <View style={styles.swipeActionLeft}>
-      <MaterialCommunityIcons name="trash-can-outline" size={32} color={"#ffba00"} />
-    </View>
-  );
+  // 5) Undo
+  const handleUndo = async () => {
+    if (!user || !deletedBackup) return;
+    const { habit, completions } = deletedBackup;
+    const newHabitId = ID.unique();
+    const clean = (d: any) => {
+      const { $id, $collectionId, $databaseId, $createdAt, $updatedAt, ...rest } = d;
+      return rest;
+    };
+    await databases.createDocument(
+      DATABASE_ID,
+      HABITS_COLLECTION_ID,
+      newHabitId,
+      { ...clean(habit), user_id: user.$id }
+    );
+    const today = new Date().toISOString().split("T")[0];
+    const todayComp = completions.find((c) =>
+      c.completed_at.split("T")[0] === today
+    );
+    if (todayComp) {
+      await databases.createDocument(
+        DATABASE_ID,
+        COMPLETIONS_COLLECTION_ID,
+        ID.unique(),
+        { ...clean(todayComp), habit_id: newHabitId, user_id: user.$id }
+      );
+    }
+    fetchHabits();
+    setDeletedBackup(null);
+    setSnackbarVisible(false);
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Button mode="text" onPress={signOut} icon={"logout"}>Sign Out</Button>
+        <Button icon="logout" onPress={signOut}>
+          Sign Out
+        </Button>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {habits.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No habits yet. Add your first habit!</Text>
+        {habits.length === 0 && (
+          <View style={styles.empty}>
+            <Text>No habits yet. Add your first one!</Text>
           </View>
-        ) : (
-          habits.map((habit, key) => (
-            <Swipeable
-              ref={(ref) => { swipeableRefs.current[habit.$id] = ref; }}
-              key={key}
-              overshootLeft={false}
-              overshootRight={false}
-              renderLeftActions={renderLeftActions}
-              renderRightActions={() => renderRightActions(habit.$id)}
-              onSwipeableOpen={(direction) => {
-                if (direction === "left") {
-                  handleDeleteHabit(habit.$id);
-                  playSound(deleted);
-                } else if (direction === "right") {
-                  if (completedHabits.includes(habit.$id)) {
-                    playSound(deny);
-                  } else {
-                    handleCompleteHabit(habit.$id);
-                    playSound(checked);
-                  }
-                }
-                swipeableRefs.current[habit.$id]?.close();
-              }}
+        )}
+        {habits.map((h) => (
+          <Swipeable
+            key={h.$id}
+            ref={(r) => { swipeRefs.current[h.$id] = r; }}
+            overshootLeft={false}
+            overshootRight={false}
+            renderLeftActions={() => (
+              <View style={styles.leftAction}>
+                <MaterialCommunityIcons
+                  name="trash-can-outline"
+                  size={32}
+                  color="#8f028fff"
+                />
+              </View>
+            )}
+            renderRightActions={() => (
+              <View style={styles.rightAction}>
+                {isHabitLocked(h) ? (
+                  <Text style={styles.lockedText}>Completed</Text>
+                ) : (
+                  <MaterialCommunityIcons
+                    name="check-circle-outline"
+                    size={32}
+                    color="#ffba00"
+                  />
+                )}
+              </View>
+            )}
+            onSwipeableOpen={(dir) => {
+              if (dir === "left") handleDelete(h);
+              else handleComplete(h);
+              swipeRefs.current[h.$id]?.close();
+            }}
+          >
+            <Surface
+              style={[
+                styles.card,
+                isHabitLocked(h) && styles.cardLocked,
+              ]}
+              elevation={1}
             >
-              <Surface
-                style={[
-                  styles.card,
-                  isHabitCompleted(habit.$id) && styles.cardCompleted,
-                ]}
-                elevation={1}
-              >
-                <View style={styles.cardContent}>
-                  <Text style={styles.cardTitle}>{habit.title}</Text>
-                  <Text style={styles.cardDescription}>{habit.description}</Text>
-                  <View style={styles.cardFooter}>
-                    <View style={styles.streakBadge}>
-                      <MaterialCommunityIcons
-                        name="fire"
-                        size={18}
-                        color={"#ff9800"}
-                      />
-                      <Text style={styles.streakText}>
-                        {habit.streak_count} day streak
-                      </Text>
-                    </View>
-                    <View style={styles.frequencyBadge}>
-                      <Text style={styles.frequencyText}>
-                        {habit.frequency.charAt(0).toUpperCase() +
-                          habit.frequency.slice(1)}
-                      </Text>
-                    </View>
+              <View style={styles.content}>
+                <Text variant="titleMedium">{h.title}</Text>
+                <Text>{h.description}</Text>
+                <View style={styles.footer}>
+                  <View style={styles.badge}>
+                    <MaterialCommunityIcons
+                      name="fire"
+                      size={18}
+                      color="#ff9800"
+                    />
+                    <Text>{h.streak_count} day streak</Text>
+                  </View>
+                  <View style={styles.badge}>
+                    <Text>{h.frequency.charAt(0).toUpperCase() + h.frequency.slice(1)}</Text>
                   </View>
                 </View>
-              </Surface>
-            </Swipeable>
-          ))
-        )}
+              </View>
+            </Surface>
+          </Swipeable>
+        ))}
       </ScrollView>
 
       <Snackbar
         visible={snackbarVisible}
         onDismiss={() => setSnackbarVisible(false)}
-        action={{
-          label: "Undo",
-          onPress: handleUndoDelete,
-        }}
+        action={{ label: "Undo", onPress: handleUndo }}
         duration={5000}
       >
         Habit deleted
       </Snackbar>
     </View>
   );
-};
-
-export default Index;
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: "#f5f5f5",
-  },
+  container: { flex: 1, backgroundColor: "#f5f5f5" },
   header: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    alignItems: "center",
-    marginBottom: 16,
+    padding: 8,
   },
-  title: {
-    fontWeight: "bold",
-  },
-  emptyState: {
-    flex: 1,
+  empty: { alignItems: "center", marginTop: 64 },
+  leftAction: {
     justifyContent: "center",
     alignItems: "center",
+    width: 80,
+    borderRadius: 8,
+    backgroundColor: "#ffba00",
   },
-  emptyStateText: {
-    color: "#888",
+  rightAction: {
+    justifyContent: "center",
+    alignItems: "center",
+    width: 80,
+    borderRadius: 8,
+    backgroundColor: "#8f028fff",
   },
+  lockedText: { color: "#ffba00", fontWeight: "700" },
   card: {
-    marginBottom: 16,
+    margin: 8,
     borderRadius: 8,
     backgroundColor: "#fff",
   },
-  cardCompleted: {
-    backgroundColor: "#fae0aaff",
-    opacity: 0.6,
-  },
-  cardContent: {
-    padding: 16,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 4,
-  },
-  cardDescription: {
-    color: "#666",
-    marginBottom: 8,
-  },
-  cardFooter: {
+  cardLocked: { opacity: 0.6 },
+  content: { padding: 16 },
+  footer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    marginTop: 12,
   },
-  streakBadge: {
+  badge: {
+    color: "#666",
     flexDirection: "row",
     alignItems: "center",
-  },
-  streakText: {
-    marginLeft: 4,
-    color: "#ff9800",
-  },
-  frequencyBadge: {
-    backgroundColor: "#e0e0e0",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  frequencyText: {
-    color: "#333",
-  },
-  swipeActionRight: {
-    justifyContent: 'center',
-    alignItems:"flex-end",
-    flex:1,
-    backgroundColor:"#8f028fff",
-    borderRadius: 18,
-    marginBottom: 18,
-    marginTop:2,
-    paddingRight:16
-  },
-  swipeActionLeft: {
-    justifyContent: 'center',
-    alignItems:"flex-start",
-    flex:1,
-    backgroundColor:"#e53935",
-    borderRadius: 18,
-    marginBottom: 18,
-    marginTop:2,
-    paddingLeft:16
   },
 });
