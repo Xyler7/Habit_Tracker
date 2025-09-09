@@ -8,12 +8,11 @@ Dragon Tracker is a mobile app designed to help you manage your daily, weekly, a
 
 ---
 
-## 📱 Ekran Görüntüleri
+## 📱 Ekran Görüntüleri / Screenshots
 
-| ✅ Habit Tamamlama | 🔥 Streak Takibi | ➕ Yeni Habit Ekleme |
 | ✅ Habit Completion | 🔥 Streak Tracking | ➕ Add New Habit |
 |-------------------|------------------|----------------------|
-| ![Complete Habit](assets/screens/index.png) | ![Delete Habit](assets/screens/index2.png)| ![Streaks](assets/screens/streaks.png) | ![Add Habit](assets/screens/add-habit.png) |
+| ![Complete Habit](assets/screens/index.png) ![Delete Habit](assets/screens/index2.png)| ![Streaks](assets/screens/streaks.png) | ![Add Habit](assets/screens/add-habit.png) |
 
 | 🔐 Giriş Ekranı | 🆕 Kayıt Ekranı |
 | 🔐 Sign In | 🆕 Sign Up |
